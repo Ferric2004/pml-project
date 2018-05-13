@@ -1,0 +1,131 @@
+---
+title: "Claudio Ferrara - Practical Machine Learning"
+author: "Claudio Ferrara"
+date: "10 maggio 2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+##The project
+
+This project, part of Pratical Machine Learning Course - Week 4, takes a large amount of data acquired by wearable devices (Nike Fuelband, Fitbit), manipulates them, and use them in order to quantify and predict the quality of their workout.
+
+The data for this project comes from this source: http://groupware.les.inf.puc-rio.br/har.
+
+
+
+##Preparing the dataset
+
+In order to conduct meaningful analysis we are gonna filter the columns which don't give us useful information about the variance in the dataset. 
+
+```{r}
+
+base <- read.csv("C:/Users/Claudio/datasciencecoursera/machine learning final/train.csv", header = TRUE, stringsAsFactors = TRUE)
+
+str(base)
+
+
+#As we look our dataset, we'll see that many features are factor and there are several columns that do not tell us relevant data, so we need to filter them or convert them to numeric
+
+base <- read.csv("C:/Users/Claudio/datasciencecoursera/machine learning final/train.csv", header = TRUE, stringsAsFactors = TRUE)
+
+base <- base[,colSums(is.na(base)) == 0]
+
+base <- base[,-c(1:7)]
+
+cancel <- grep("kurtosis|skewness|_yaw_dumbbell|_yaw_belt|_yaw_forearm",names(base), value = FALSE)
+
+base <- base[,-cancel]
+
+```
+
+
+##Creating Validation and training set
+
+We are gonna create three set, the training and two validation set, to reduce training time and get a precise out of sample error.
+
+
+```{r}
+
+library(caret)
+set.seed(125)
+
+partition <- createDataPartition(base$classe, p = 0.5, list = FALSE)
+
+training <- base[partition,]
+valid <- base[-partition,]
+
+set.seed(150)
+valid.part <- createDataPartition(valid$classe, p = 0.5, list = FALSE)
+valid1 <- valid[valid.part,]
+valid2 <- valid[-valid.part,]
+
+```
+
+
+## Choosing a model and improving its performances
+
+Since we need a 98% or more accuracy to obtain good predictions and pass the course quiz, we choose "random forest" as algorithm to train our model. We will use cross validation as argument to the traincontrol function, using 5 folds, then we'll preprocess data.
+
+
+
+```{r}
+fitControl <- trainControl(method = "cv",
+                           number = 5,
+                           allowParallel = TRUE)
+
+
+pre.poc <- preProcess(training, method = c("center", "scale"))
+training <- predict(pre.poc, training)
+                           
+rf <- train(classe~., data = training,method = "rf", trControl = fitControl)     
+                           
+
+```
+
+
+##Testing the model accuracy
+
+First, we need to preprocess the validation) set, like we did with training data, then we apply the confusion matrix to test the accuracy of our prediction.
+
+
+```{r}
+
+valid1 <- predict(pre.poc, valid1)
+confusionMatrix(predict(rf, valid1), valid1$classe)
+
+```
+
+To get the Out of Sample error, we test the model on valid2, the second set we partitioned at the beginning of our project.
+
+```{r}
+
+valid2 <- predict(pre.poc, valid2)
+confusionMatrix(predict(rf, valid2), valid2$classe)
+
+```
+
+
+#Applying on testing test set
+
+
+```{r}
+
+#testing is the data set that we want to predict
+
+testing <- read.csv("C:/Users/Claudio/datasciencecoursera/machine learning final/pml-testing.csv", header = TRUE, stringsAsFactors = FALSE)
+
+testing <- testing[,colSums(is.na(testing)) == 0]
+
+testing <- testing[,-c(1:7)]
+
+testing <- predict(preProcess(testing, method = c("center", "scale")), testing)
+
+pred.testing <- predict(rf, testing)
+
+pred.testing
+
+```
